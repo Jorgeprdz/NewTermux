@@ -16,6 +16,18 @@ public final class TacticHeaderGeometry {
     private TacticHeaderGeometry() { }
 
     /**
+     * Use the reported system caption when possible; OEM DeX windows can omit
+     * it for legacy-targeted apps. External displays or wide landscape
+     * viewports should still hide duplicated legacy desktop rows.
+     */
+    public static boolean shouldUseDesktop(boolean hasCaption, boolean inMultiWindow,
+        boolean externalDisplay, boolean landscape, int widthPx,
+        int compactMinWidthPx, int wideMinWidthPx) {
+        return hasCaption || externalDisplay || (inMultiWindow && widthPx >= compactMinWidthPx)
+            || (landscape && widthPx >= wideMinWidthPx);
+    }
+
+    /**
      * Largest contiguous portion of the caption row not covered by system bounding rects.
      * An empty/unknown occupied list is UNSAFE: do not place controls blindly.
      */

@@ -42,3 +42,11 @@ Base: NewTermux v1.6.2, commit `6001da84bb2775508e3e3346084958eb7b143480`. Branc
 **PENDING / NO-GO for Phase 2 until** source compiles, demo is verified safe and available, no P0/P1 static blockers remain, and Samsung DeX physical capture verifies the sole caption header and native window controls. Never claim a PASS from static code alone.
 
 Reference: https://developer.android.com/develop/adaptive-apps/guides/support-desktop-windowing
+
+## DeX screenshot regression / Phase 1 P0 follow-up
+
+An actual DeX screenshot showed the platform caption **plus** both legacy NewTermux rows and noisy demo-shell errors. Automated PASS did not mean DeX UX PASS. The first implementation only opted into edge-to-edge after observing a caption inset, a circular dependency in legacy-targetSdk/OEM compatibility paths, and detected desktop via multi-window alone.
+
+The correction detects DeX external displays and wide landscape windows independently of caption inset availability, enters edge-to-edge first, requests fresh insets, hides the two legacy desktop rows, and keeps the OEM caption fully owned by Android. When `captionBar/getBoundingRects` are not exposed, it shows only a small overflow chip (not a second title bar); the menu now reports caption height, safe-region count and detection path for physical QA. Desktop extra keys are collapsed by default but available via overflow, without changing saved mobile preferences. The coexist demo fake shell uses only built-in shell commands, avoiding `clear` and `printf` errors caused by the stripped demo PATH.
+
+**Physical DeX status remains NO-GO until screenshot and interaction validation of this correction.**

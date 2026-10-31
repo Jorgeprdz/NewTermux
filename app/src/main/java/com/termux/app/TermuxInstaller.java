@@ -67,20 +67,18 @@ public final class TermuxInstaller {
 
     private static final String LOG_TAG = "TermuxInstaller";
 
+    // Coexist demo is intentionally NOT a real Termux shell. Use shell builtins
+    // only: inherited Termux PATH may not include clear or printf executables.
     private static final String DEMO_SHELL_SCRIPT =
         "#!/system/bin/sh\n" +
-        "clear\n" +
         "echo ''\n" +
-        "echo '  ╔══════════════════════════════════════════╗'\n" +
-        "echo '  ║      NewTermux — Test / Coexist Mode     ║'\n" +
-        "echo '  ║  Settings, toolbar & UI are fully live.  ║'\n" +
-        "echo '  ║  Shell commands are disabled here.       ║'\n" +
-        "echo '  ╚══════════════════════════════════════════╝'\n" +
+        "echo ' TACTIC TERMINAL  /  INTERFACE PREVIEW'\n" +
+        "echo ' Demo mode - commands disabled; UI controls available.'\n" +
         "echo ''\n" +
         "while true; do\n" +
-        "  printf '$ '\n" +
-        "  read line\n" +
-        "  [ -n \"$line\" ] && echo \"[test-mode] $line\"\n" +
+        "  echo 'demo >'\n" +
+        "  IFS= read line || break\n" +
+        "  [ -n \"$line\" ] && echo \"[demo] $line\"\n" +
         "done\n";
 
     /** Performs bootstrap setup if necessary. */

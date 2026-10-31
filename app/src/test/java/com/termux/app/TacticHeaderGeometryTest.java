@@ -6,6 +6,27 @@ import java.util.Collections;
 import static org.junit.Assert.*;
 
 public class TacticHeaderGeometryTest {
+    @Test public void deXExternalDisplayWorksWithoutCaptionInsets() {
+        assertTrue(TacticHeaderGeometry.shouldUseDesktop(false, false, true,
+            true, 1000, 450, 840));
+    }
+
+    @Test public void wideLandscapeCanEnterDesktopButPortraitPhoneCannot() {
+        assertTrue(TacticHeaderGeometry.shouldUseDesktop(false, false, false,
+            true, 950, 450, 840));
+        assertFalse(TacticHeaderGeometry.shouldUseDesktop(false, false, false,
+            false, 950, 450, 840));
+        assertFalse(TacticHeaderGeometry.shouldUseDesktop(false, false, false,
+            true, 430, 450, 840));
+    }
+
+    @Test public void compactFreeformNeedsMinimumWidth() {
+        assertTrue(TacticHeaderGeometry.shouldUseDesktop(false, true, false,
+            false, 520, 450, 840));
+        assertFalse(TacticHeaderGeometry.shouldUseDesktop(false, true, false,
+            false, 320, 450, 840));
+    }
+
     @Test public void avoidsNativeButtonsAtBothEnds() {
         TacticHeaderGeometry.Span span = TacticHeaderGeometry.safeSpan(1200, 42,
             Arrays.asList(new int[]{0, 0, 90, 42}, new int[]{1040, 0, 1200, 42}), 120, 8);

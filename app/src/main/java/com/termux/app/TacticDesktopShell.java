@@ -1,6 +1,9 @@
 package com.termux.app;
 
 import android.content.Intent;
+import android.content.res.Configuration;
+import android.view.Display;
+import android.app.AlertDialog;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -46,6 +49,13 @@ public final class TacticDesktopShell {
     private WindowInsets lastInsets;
     private boolean edgeToEdge;
     private boolean captionControlsVisible;
+    private boolean desktopMode;
+    private boolean desktopExtraKeysExpanded;
+    private int originalExtraKeysVisibility;
+    private int lastCaptionHeight;
+    private int lastCaptionRects;
+    private int lastWindowWidth;
+    private String lastReason = "Waiting for window metrics";
 
     public TacticDesktopShell(TermuxActivity activity) {
         this.activity = activity;
@@ -53,6 +63,7 @@ public final class TacticDesktopShell {
         caption = activity.findViewById(R.id.tactic_caption_overlay);
         terminalRoot = activity.findViewById(R.id.activity_termux_root_view);
         mobileToolbar = activity.findViewById(R.id.newtermux_toolbar_container);
+        originalExtraKeysVisibility = activity.getTerminalToolbarViewPager().getVisibility();
 
         strip = new LinearLayout(activity);
         strip.setGravity(Gravity.CENTER_VERTICAL);
@@ -79,10 +90,10 @@ public final class TacticDesktopShell {
         });
         moreButton.setOnClickListener(this::showActions);
 
-        floatingMenu = label("TACTIC  ⋯", "Tactic session and terminal actions", true);
+        floatingMenu = label("⋯", "Tactic terminal actions and sessions", true);
         FrameLayout.LayoutParams floatParams = new FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT, dp(38), Gravity.END | Gravity.BOTTOM);
-        floatParams.setMargins(dp(8), dp(8), dp(14), dp(14));
+            FrameLayout.LayoutParams.WRAP_CONTENT, dp(34), Gravity.END | Gravity.TOP);
+        floatParams.setMargins(dp(8), dp(12), dp(14), dp(8));
         frame.addView(floatingMenu, floatParams);
         floatingMenu.setVisibility(View.GONE);
         floatingMenu.setOnClickListener(this::showActions);
@@ -128,11 +139,16 @@ public final class TacticDesktopShell {
         return tv;
     }
 
-    private void setEdgeToEdge(boolean enabled) {
-        if (Build.VERSION.SDK_INT < 30 || edgeToEdge == enabled) return;
+    /**
+     * DeX can supply a system caption without reporting captionBar insets to
+     * old-targetSdk apps. Opt into edge-to-edge based on window context FIRST.
+     * The previous code only enabled it after seeing caption insets, a cycle
+     * that left both legacy header rows visible on the actual device.
+     */
+    private boolean setEdgeToEdge(boolean enabled) {
+        if (Build.VERSION.SDK_INT < 30 || edgeToEdge == enabled) return false;
         edgeToEdge = enabled;
         activity.getWindow().setDecorFitsSystemWindows(!enabled);
-        // Caption mode is explicitly opt-in and independently reversible.
         if (Build.VERSION.SDK_INT >= 35) {
             WindowInsetsController controller = activity.getWindow().getInsetsController();
             if (controller != null) {
@@ -140,6 +156,55 @@ public final class TacticDesktopShell {
                 controller.setSystemBarsAppearance(enabled ? flag : 0, flag);
             }
         }
+        return true;
+    }
+
+    private boolean likelyDesktopWindow(int width, boolean hasCaption) {
+        Display display = activity.getDisplay();
+        boolean external = display != null && display.getDisplayId() != Display.DEFAULT_DISPLAY;
+        boolean landscape = activity.getResources().getConfiguration().orientation
+            == Configuration.ORIENTATION_LANDSCAPE;
+        return TacticHeaderGeometry.shouldUseDesktop(hasCaption, activity.isInMultiWindowMode(),
+            external, landscape, width, dp(450), dp(840));
+    }
+
+    private void adaptExtraKeys(boolean desktop) {
+        View pager = activity.getTerminalToolbarViewPager();
+        if (pager == null) return;
+        if (desktop && !desktopMode) {
+            originalExtraKeysVisibility = pager.getVisibility();
+            desktopExtraKeysExpanded = false;
+        }
+        if (desktop) {
+            pager.setVisibility(desktopExtraKeysExpanded ? View.VISIBLE : View.GONE);
+        } else if (desktopMode) {
+            pager.setVisibility(originalExtraKeysVisibility);
+        }
+    }
+
+    private void toggleExtraKeys() {
+        if (!desktopMode) {
+            activity.toggleTerminalToolbar();
+        } else {
+            desktopExtraKeysExpanded = !desktopExtraKeysExpanded;
+            activity.getTerminalToolbarViewPager().setVisibility(
+                desktopExtraKeysExpanded ? View.VISIBLE : View.GONE);
+        }
+        returnFocusToTerminal();
+    }
+
+    private void showDiagnostics() {
+        new AlertDialog.Builder(activity)
+            .setTitle("Tactic desktop window diagnostics")
+            .setMessage("Window width: " + lastWindowWidth + " px\n"
+                + "Caption height: " + lastCaptionHeight + " px\n"
+                + "Caption rects: " + lastCaptionRects + "\n"
+                + "Edge-to-edge: " + edgeToEdge + "\n"
+                + "Desktop mode: " + desktopMode + "\n"
+                + "Header integrated: " + captionControlsVisible + "\n"
+                + "Detection: " + lastReason + "\n\n"
+                + "A native caption pass requires real DeX hardware validation.")
+            .setPositiveButton("OK", null).show();
     }
 
     private void applyInsets(WindowInsets insets) {
@@ -151,21 +216,30 @@ public final class TacticDesktopShell {
         boolean hasCaption = Build.VERSION.SDK_INT >= 35
             && insets.isVisible(WindowInsets.Type.captionBar())
             && captionHeight > 0;
-        // Some OEM freeform caption surfaces expose no safe bounding rects.
-        // A windowed wide app must not acquire a duplicate permanent header.
-        boolean windowedFallback = activity.isInMultiWindowMode() && width >= dp(450);
-        boolean desktop = hasCaption || windowedFallback;
-        setEdgeToEdge(hasCaption);
+        boolean desktop = likelyDesktopWindow(width, hasCaption);
+        // IMPORTANT: Do not wait for caption insets to opt into edge-to-edge.
+        // DeX/old-targetSdk compatibility can otherwise hide them indefinitely.
+        boolean changedDecor = setEdgeToEdge(desktop);
         mobileToolbar.setVisibility(desktop ? View.GONE : View.VISIBLE);
-        terminalRoot.setFitsSystemWindows(!hasCaption);
-        int top = hasCaption ? Math.max(captionHeight, insets.getInsets(WindowInsets.Type.statusBars()).top) : 0;
-        int bottom = hasCaption ? insets.getInsets(WindowInsets.Type.navigationBars()).bottom : 0;
+        terminalRoot.setFitsSystemWindows(!desktop);
+        int top = desktop ? Math.max(captionHeight,
+            insets.getInsets(WindowInsets.Type.statusBars()).top) : 0;
+        int bottom = desktop ? insets.getInsets(WindowInsets.Type.navigationBars()).bottom : 0;
         if (terminalRoot.getPaddingTop() != top || terminalRoot.getPaddingBottom() != bottom)
             terminalRoot.setPadding(0, top, 0, bottom);
+        adaptExtraKeys(desktop);
+        desktopMode = desktop;
+        lastWindowWidth = width;
+        lastCaptionHeight = captionHeight;
+        lastReason = hasCaption ? "Android captionBar present"
+            : (desktop ? "DeX/wide-window fallback; caption not exposed" : "Mobile viewport");
+        if (changedDecor) frame.post(frame::requestApplyInsets);
 
         boolean safe = false;
+        lastCaptionRects = 0;
         if (hasCaption) {
             List<Rect> occupiedRects = insets.getBoundingRects(WindowInsets.Type.captionBar());
+            lastCaptionRects = occupiedRects.size();
             List<int[]> occupied = new ArrayList<>();
             for (Rect rect : occupiedRects)
                 occupied.add(new int[]{rect.left, rect.top, rect.right, rect.bottom});
@@ -195,6 +269,13 @@ public final class TacticDesktopShell {
         captionControlsVisible = safe;
         caption.setVisibility(safe ? View.VISIBLE : View.GONE);
         floatingMenu.setVisibility(desktop && !safe ? View.VISIBLE : View.GONE);
+        // This is a single discreet overflow chip, not a second title bar.
+        FrameLayout.LayoutParams floatingParams = (FrameLayout.LayoutParams) floatingMenu.getLayoutParams();
+        int floatingTop = top + dp(10);
+        if (floatingParams.topMargin != floatingTop) {
+            floatingParams.topMargin = floatingTop;
+            floatingMenu.setLayoutParams(floatingParams);
+        }
         if (safe) {
             caption.post(this::updateExclusionRects);
         } else {
@@ -265,6 +346,7 @@ public final class TacticDesktopShell {
         menu.add(0, 10, 9, "Command shortcuts");
         menu.add(0, 11, 10, "Extra keys");
         menu.add(0, 12, 11, "Terminal context menu");
+        menu.add(0, 13, 12, "Desktop diagnostics");
         popup.setOnMenuItemClickListener(item -> {
             switch (item.getItemId()) {
                 case 1: anchor.post(() -> showSessions(anchor)); break;
@@ -277,8 +359,9 @@ public final class TacticDesktopShell {
                 case 8: clickLegacy(R.id.btn_root_toggle); break;
                 case 9: clickLegacy(R.id.btn_stt); break;
                 case 10: activity.getDrawer().openDrawer(Gravity.START); break;
-                case 11: activity.toggleTerminalToolbar(); break;
+                case 11: toggleExtraKeys(); break;
                 case 12: activity.getTerminalView().showContextMenu(); break;
+                case 13: showDiagnostics(); break;
                 default: return false;
             }
             return true;
