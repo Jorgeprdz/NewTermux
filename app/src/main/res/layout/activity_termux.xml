@@ -1,4 +1,13 @@
-<com.termux.app.terminal.TermuxActivityRootView xmlns:android="http://schemas.android.com/apk/res/android"
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A transparent, non-clickable overlay can draw inside a reported caption inset.
+     The existing Termux root remains the only content host for the terminal/IME. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/tactic_shell_frame"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="false">
+
+    <com.termux.app.terminal.TermuxActivityRootView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/activity_termux_root_view"
@@ -127,4 +136,13 @@
         android:layout_height="1dp"
         android:background="@android:color/transparent" />
 
-</com.termux.app.terminal.TermuxActivityRootView>
+    </com.termux.app.terminal.TermuxActivityRootView>
+    <FrameLayout
+        android:id="@+id/tactic_caption_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_gravity="top"
+        android:background="@color/tactic_caption_background"
+        android:visibility="gone" />
+
+</FrameLayout>

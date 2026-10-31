@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Tactic R1 shell tokens; keep these shared with a future Compose tab strip. -->
+    <color name="tactic_caption_background">#111927</color>
+    <color name="tactic_header_button">#233146</color>
+    <color name="tactic_accent">#4B8DFF</color>
+    <color name="tactic_header_foreground">#E6EDF7</color>
     <!-- NewTermux Modern Color Palette (Material 3) -->
     <!-- Primary brand -->
     <color name="nt_primary">#BB86FC</color>
@@ -37,10 +42,10 @@
     <!-- Session tab bar -->
     <color name="nt_tab_active">#BB86FC</color>
     <color name="nt_tab_inactive">#6B6B6B</color>
-    <color name="nt_tab_bg">#1A1A1A</color>
+    <color name="nt_tab_bg">#111927</color>
 
     <!-- Toolbar -->
-    <color name="nt_toolbar_bg">#1A1A1A</color>
+    <color name="nt_toolbar_bg">#111927</color>
     <color name="nt_toolbar_icon">#FFFFFF</color>
     <color name="nt_toolbar_text">#FFFFFF</color>
 

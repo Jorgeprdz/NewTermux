@@ -219,6 +219,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private ImageButton mBtnSTT;
     private ImageButton mBtnRootToggle;
     private LinearLayout mSessionPipContainer;
+    /** R1: desktop caption UI; never owns processes or terminal sessions. */
+    private TacticDesktopShell mTacticDesktopShell;
     private static final int REQUEST_RECORD_AUDIO = 201;
 
     // SAF launchers for Export Screen and Make Script
@@ -335,6 +337,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         setupDrawerCommandButtons();
 
         setupNewTermuxFeatures();
+
+        // Install only after the original toolbar callbacks have been bound.
+        // The shell delegates actions to this Activity; it never reimplements PTY logic.
+        mTacticDesktopShell = new TacticDesktopShell(this);
 
         registerForContextMenu(mTerminalView);
 
@@ -915,6 +921,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
     /** Update the horizontal session pip row with live mini terminal previews. */
     public void updateSessionTabs() {
+        if (mTacticDesktopShell != null) mTacticDesktopShell.refreshSessions();
         if (mSessionPipContainer == null || mTermuxService == null) return;
 
         mSessionPipContainer.removeAllViews();
@@ -923,7 +930,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         float density   = getResources().getDisplayMetrics().density;
         int pipWidthPx  = (int) (density * 86);
-        int pipHeightPx = (int) (density * 58);
+        int pipHeightPx = (int) (density * 30);
         int marginPx    = (int) (density * 4);
         int labelGapPx  = (int) (density * 2);
 
@@ -976,6 +983,17 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
             mSessionPipContainer.addView(wrapper);
         }
+    }
+
+    /** Expose only the existing session-action menu to the caption UI. */
+    void showTacticSessionActions(View anchor) {
+        TerminalSession current = getCurrentSession();
+        if (current != null) showSessionPopupMenu(anchor, current);
+    }
+
+    /** Reuse the original Package Manager menu with a *visible* caption anchor. */
+    void showTacticPackages(View anchor) {
+        if (mPackageManagerMenu != null) mPackageManagerMenu.show(anchor);
     }
 
     private void showSessionPopupMenu(View anchor, TerminalSession session) {
